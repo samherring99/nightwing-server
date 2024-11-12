@@ -8,8 +8,10 @@ import torch
 
 app = FastAPI()
 
-tokenizer = AutoTokenizer.from_pretrained("solidrust/Mistral-7B-Instruct-v0.3-AWQ")
-model = AutoModelForCausalLM.from_pretrained("solidrust/Mistral-7B-Instruct-v0.3-AWQ")
+model_path = "Qwen/Qwen2.5-Coder-7B-Instruct-AWQ"
+
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16)
 embed_model = AutoModel.from_pretrained("BAAI/bge-small-en")
 embed_tokenizer = AutoTokenizer.from_pretrained("BAAI/bge-small-en")
 
@@ -27,19 +29,35 @@ async def process_chat_requests():
         request_data = await chat_request_queue.get()
         request, response_future = request_data["request"], request_data["response_future"]
 
-        prompt = " ".join([msg.content + "\n" for msg in request.messages])
-        inputs = tokenizer(prompt, return_tensors="pt")
+        text = tokenizer.apply_chat_template(
+            request.messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
-        with torch.no_grad():
-            outputs = model.generate(
-                inputs.input_ids.cuda(),
-                max_new_tokens=request.max_tokens,
-                temperature=request.temperature,
-                top_p=request.top_p,
-                do_sample=True,
-            )
+        generated_ids = model.generate(
+            **model_inputs,
+            max_new_tokens=request.max_tokens
+        )
+        generated_ids = [
+            output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+        ]
 
-        reply_text = tokenizer.batch_decode(outputs[:, inputs.input_ids.shape[1]:])[0]
+        reply_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        # inputs = tokenizer(prompt, return_tensors="pt")
+
+        # with torch.no_grad():
+        #     outputs = model.generate(
+        #         inputs.input_ids.cuda(),
+        #         max_new_tokens=request.max_tokens,
+        #         temperature=request.temperature,
+        #         top_p=request.top_p,
+        #         do_sample=True,
+        #         pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+        #     )
+
+        # reply_text = tokenizer.batch_decode(outputs[:, inputs.input_ids.shape[1]:])[0]
         response_future.set_result({"reply": reply_text})
         chat_request_queue.task_done()
 
