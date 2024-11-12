@@ -4,7 +4,7 @@ import termios
 import time
 import tty
 
-from client_test import NightwingClient
+from client import NightwingClient
 from datetime import datetime
 
 def escape_chars(text):
