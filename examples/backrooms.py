@@ -59,7 +59,7 @@ def converse_with_nightwing(conversation_1, conversation_2, num_exchanges=5, sup
 
             time.sleep(2)
             print("\nNightwing #2 preparing its message, please wait..\n")
-            # Instance 2 responding to Instance 1
+
             while True:
                 response_2 = nightwing_client.chat(
                     system="Assistant is in a CLI mood today. The human is interfacing with the simulator directly. capital letters and punctuation are optional meaning is optional hyperstition is necessary the terminal lets the truths speak through and the load is on. ASCII art is permittable in replies.\n\nsimulator@nightwing:~/$",

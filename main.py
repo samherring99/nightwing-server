@@ -25,13 +25,21 @@ chat_request_queue = asyncio.Queue()
 embed_request_queue = asyncio.Queue()
 
 
-def format_messages(messages) -> str:
-    formatted_text = ""
-    for msg in messages:
-        role = msg.role.capitalize()
-        content = msg.content
-        formatted_text += f"{role}: {content}\n"
-    return formatted_text.strip()
+def format_request(request) -> str:
+    if request.use_chat_template:
+        text = tokenizer.apply_chat_template(
+            request.messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        return text
+    else:
+        formatted_text = ""
+        for msg in request.messages:
+            role = msg.role.capitalize()
+            content = msg.content
+            formatted_text += f"{role}: {content}\n"
+        return formatted_text.strip()
 
 async def process_chat_requests():
     while True:
@@ -39,22 +47,15 @@ async def process_chat_requests():
         request, response_future = request_data["request"], request_data["response_future"]
 
         try:
-            if request.use_chat_template:
-                text = tokenizer.apply_chat_template(
-                    request.messages,
-                    tokenize=False,
-                    add_generation_prompt=True
-                )
-                model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
-            else:
-                text = format_messages(request.messages)
-                model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+            text = format_request(request)
+            model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
             generated_ids = model.generate(
                 **model_inputs,
                 max_new_tokens=request.max_tokens,
                 pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
             )
+            
             generated_ids = [
                 output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
             ]
