@@ -15,8 +15,18 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
 
-class EmbedRequest(BaseModel):
-    text: str
+class CompletionRequest(BaseModel):
+    prompt: str
+    max_tokens: int = 100
+    num_particles: Optional[int] = 5
+    beam_factor: Optional[int] = 1
+    top_p: Optional[float] = 0.9
+    top_k: Optional[int] = 50
+    
+    @property
+    def messages(self):
+        # Convert single prompt to messages format for consistency
+        return [{"role": "user", "content": self.prompt}]
 
-class EmbedResponse(BaseModel):
-    embeddings: List[float]
+class CompletionResponse(BaseModel):
+    reply: str
